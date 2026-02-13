@@ -1,13 +1,14 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ImageIcon, FileText, BrainCircuit, MessageSquare, Plus, Sparkles } from "lucide-react";
 
-const stats = [
-    { label: "Imagens geradas", value: "0", icon: ImageIcon, color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: "Páginas ativas", value: "0", icon: FileText, color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "Respostas de quiz", value: "0", icon: BrainCircuit, color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "Conversas", value: "0", icon: MessageSquare, color: "text-green-400", bg: "bg-green-500/10" },
+const statsMeta = [
+    { label: "Imagens geradas", key: "images", icon: ImageIcon, color: "text-purple-400", bg: "bg-purple-500/10" },
+    { label: "Páginas ativas", key: "pages", icon: FileText, color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "Respostas de quiz", key: "quizResponses", icon: BrainCircuit, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+    { label: "Conversas", key: "conversations", icon: MessageSquare, color: "text-green-400", bg: "bg-green-500/10" },
 ];
 
 const quickActions = [
@@ -16,12 +17,45 @@ const quickActions = [
     { label: "Novo Quiz", href: "/dashboard/quiz", icon: BrainCircuit, gradient: "from-cyan-600 to-cyan-800" },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+    const supabase = await createClient();
+
+    // Get authenticated user
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Fetch profile for display name
+    let userName = "Usuário";
+    if (user) {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("name")
+            .eq("id", user.id)
+            .single();
+        if (profile?.name) {
+            userName = profile.name;
+        }
+    }
+
+    // Fetch stats counts in parallel
+    const [imagesRes, pagesRes, quizResponsesRes, conversationsRes] = await Promise.all([
+        supabase.from("generated_images").select("*", { count: "exact", head: true }),
+        supabase.from("pages").select("*", { count: "exact", head: true }),
+        supabase.from("quiz_responses").select("*", { count: "exact", head: true }),
+        supabase.from("conversations").select("*", { count: "exact", head: true }),
+    ]);
+
+    const counts: Record<string, number> = {
+        images: imagesRes.count ?? 0,
+        pages: pagesRes.count ?? 0,
+        quizResponses: quizResponsesRes.count ?? 0,
+        conversations: conversationsRes.count ?? 0,
+    };
+
     return (
         <div className="space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-white">Bem-vindo de volta! 👋</h1>
+                <h1 className="text-2xl font-bold text-white">Bem-vindo de volta, {userName}! 👋</h1>
                 <p className="text-[#a3a3a3] mt-1">
                     Aqui está um resumo do seu marketing com IA.
                 </p>
@@ -29,13 +63,13 @@ export default function DashboardPage() {
 
             {/* Stats grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat) => (
+                {statsMeta.map((stat) => (
                     <Card key={stat.label} className="bg-[#141414] border-[#262626]">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-[#a3a3a3]">{stat.label}</p>
-                                    <p className="text-3xl font-bold text-white mt-1">{stat.value}</p>
+                                    <p className="text-3xl font-bold text-white mt-1">{counts[stat.key]}</p>
                                 </div>
                                 <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
                                     <stat.icon className={`w-6 h-6 ${stat.color}`} />

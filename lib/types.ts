@@ -127,3 +127,18 @@ export interface DashboardStats {
     quizResponses: number;
     conversations: number;
 }
+
+export interface PageAnalysisReport {
+    score: number;
+    strengths: string[];
+    weaknesses: string[];
+}
+
+export interface PageAnalysis {
+    id: string;
+    user_id: string;
+    url: string;
+    cro_score: number;
+    report_data: PageAnalysisReport;
+    created_at: string;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -144,9 +144,36 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const [collapsed, setCollapsed] = useState(false);
+    const [userInitial, setUserInitial] = useState("U");
+    const [creditsImages, setCreditsImages] = useState<number | null>(null);
+    const [creditsPages, setCreditsPages] = useState<number | null>(null);
     const pathname = usePathname();
     const router = useRouter();
     const supabase = createClient();
+
+    useEffect(() => {
+        async function fetchUserData() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Set avatar initial from email
+            const email = user.email || "";
+            setUserInitial(email.charAt(0).toUpperCase());
+
+            // Fetch credits from profile
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("credits_images, credits_pages")
+                .eq("id", user.id)
+                .single();
+
+            if (profile) {
+                setCreditsImages(profile.credits_images ?? 0);
+                setCreditsPages(profile.credits_pages ?? 0);
+            }
+        }
+        fetchUserData();
+    }, [pathname]);
 
     async function handleLogout() {
         await supabase.auth.signOut();
@@ -205,10 +232,10 @@ export default function DashboardLayout({
                         {/* Credits */}
                         <div className="hidden sm:flex items-center gap-2">
                             <Badge variant="secondary" className="bg-[#1a1a1a] text-[#a3a3a3] border-[#262626] text-xs">
-                                🖼️ 10
+                                🖼️ {creditsImages ?? "—"}
                             </Badge>
                             <Badge variant="secondary" className="bg-[#1a1a1a] text-[#a3a3a3] border-[#262626] text-xs">
-                                📄 3
+                                📄 {creditsPages ?? "—"}
                             </Badge>
                         </div>
 
@@ -218,7 +245,7 @@ export default function DashboardLayout({
                                 <Button variant="ghost" size="icon" className="rounded-full">
                                     <Avatar className="w-8 h-8">
                                         <AvatarFallback className="bg-purple-500/20 text-purple-400 text-xs font-bold">
-                                            U
+                                            {userInitial}
                                         </AvatarFallback>
                                     </Avatar>
                                 </Button>

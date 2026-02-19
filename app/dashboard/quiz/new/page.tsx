@@ -17,6 +17,9 @@ import {
     GripVertical,
     BrainCircuit,
     Trophy,
+    Sparkles,
+    Wand2,
+    Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { QuizConfig, QuizSettings } from "@/lib/types";
@@ -73,11 +76,16 @@ function createEmptyResult(): ResultDraft {
     };
 }
 
+type CreationMode = "manual" | "ai";
+
 export default function NewQuizPage() {
     const router = useRouter();
     const [saving, setSaving] = useState(false);
+    const [creationMode, setCreationMode] = useState<CreationMode>("ai");
+    const [generating, setGenerating] = useState(false);
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
+    const [aiQuantity, setAiQuantity] = useState(5);
     const [questions, setQuestions] = useState<QuestionDraft[]>([
         createEmptyQuestion(),
     ]);
@@ -157,6 +165,56 @@ export default function NewQuizPage() {
         const updated = [...results];
         updated[rIdx] = { ...updated[rIdx], [field]: value };
         setResults(updated);
+    }
+
+    // --- AI Generation ---
+    async function handleGenerateAI() {
+        if (!title.trim()) {
+            toast.error("Informe o título do quiz para gerar com IA");
+            return;
+        }
+
+        setGenerating(true);
+        try {
+            const res = await fetch("/api/generate-quiz", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: title.trim(),
+                    description: description.trim() || undefined,
+                    quantity: aiQuantity,
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Erro ao gerar quiz");
+            }
+
+            const data = await res.json();
+            const aiQuestions: QuestionDraft[] = data.questions.map(
+                (q: { title: string; options: { text: string; points: number }[] }) => ({
+                    id: generateId(),
+                    text: q.title,
+                    type: "single" as const,
+                    options: q.options.map((o: { text: string; points: number }) => ({
+                        id: generateId(),
+                        text: o.text,
+                        points: o.points,
+                    })),
+                })
+            );
+
+            setQuestions(aiQuestions);
+            setCreationMode("manual"); // Switch to manual so user sees and can edit
+            toast.success(`${aiQuestions.length} perguntas geradas com IA! ✨ Revise e salve.`);
+        } catch (err) {
+            toast.error(
+                err instanceof Error ? err.message : "Erro ao gerar quiz com IA"
+            );
+        } finally {
+            setGenerating(false);
+        }
     }
 
     // --- Save ---
@@ -285,6 +343,101 @@ export default function NewQuizPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Creation Mode Toggle */}
+            <div className="flex items-center gap-1 p-1 bg-[#141414] border border-[#262626] rounded-xl w-fit">
+                <button
+                    onClick={() => setCreationMode("ai")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${creationMode === "ai"
+                        ? "bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 shadow-sm"
+                        : "text-[#666] hover:text-[#a3a3a3]"
+                        }`}
+                >
+                    <Sparkles className="w-4 h-4" />
+                    Gerar com IA
+                </button>
+                <button
+                    onClick={() => setCreationMode("manual")}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${creationMode === "manual"
+                        ? "bg-[#1e1e1e] text-white shadow-sm"
+                        : "text-[#666] hover:text-[#a3a3a3]"
+                        }`}
+                >
+                    <BrainCircuit className="w-4 h-4" />
+                    Criar Manualmente
+                </button>
+            </div>
+
+            {/* AI Generation Panel */}
+            {creationMode === "ai" && (
+                <Card className="bg-[#141414] border-[#262626] overflow-hidden">
+                    <div className="h-1 bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500" />
+                    <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
+                                <Sparkles className="w-5 h-5 text-purple-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-semibold">Gerador com IA</h3>
+                                <p className="text-[#666] text-xs">
+                                    Informe o tema e a IA cria as perguntas para você
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-[#a3a3a3] text-xs">Quantidade de perguntas</Label>
+                            <div className="flex items-center gap-2">
+                                {[3, 5, 7, 10].map((n) => (
+                                    <button
+                                        key={n}
+                                        onClick={() => setAiQuantity(n)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${aiQuantity === n
+                                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                            : "bg-[#0a0a0a] text-[#666] border border-[#262626] hover:border-[#444] hover:text-[#a3a3a3]"
+                                            }`}
+                                    >
+                                        {n}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <Button
+                            onClick={handleGenerateAI}
+                            disabled={generating || !title.trim()}
+                            className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white gap-2 h-11 font-semibold"
+                        >
+                            {generating ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Gerando perguntas...
+                                </>
+                            ) : (
+                                <>
+                                    <Wand2 className="w-4 h-4" />
+                                    Gerar Perguntas Mágicas ✨
+                                </>
+                            )}
+                        </Button>
+
+                        {generating && (
+                            <div className="space-y-3 pt-2">
+                                {Array.from({ length: Math.min(aiQuantity, 3) }).map((_, i) => (
+                                    <div key={i} className="bg-[#0a0a0a] rounded-xl p-4 border border-[#1e1e1e] space-y-2" style={{ animationDelay: `${i * 150}ms` }}>
+                                        <div className="h-4 w-3/4 bg-[#1a1a1a] rounded animate-pulse" />
+                                        <div className="space-y-1.5">
+                                            <div className="h-3 w-1/2 bg-[#1a1a1a] rounded animate-pulse" />
+                                            <div className="h-3 w-2/3 bg-[#1a1a1a] rounded animate-pulse" />
+                                        </div>
+                                    </div>
+                                ))}
+                                <p className="text-center text-[#666] text-xs">A IA está criando seu quiz...</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Questions */}
             <div className="space-y-4">

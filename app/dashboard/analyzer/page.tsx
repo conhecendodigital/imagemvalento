@@ -317,12 +317,12 @@ export default function AnalyzerPage() {
                                     Análise CRO Completa
                                 </h3>
                                 <a
-                                    href={currentResult.url}
+                                    href={currentResult.target_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-sm text-blue-400 hover:underline break-all"
                                 >
-                                    {currentResult.url}
+                                    {currentResult.target_url}
                                 </a>
                             </div>
                         </div>
@@ -416,7 +416,7 @@ export default function AnalyzerPage() {
                                             <MiniScoreRing score={item.cro_score} />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm text-white font-medium truncate">
-                                                    {truncateUrl(item.url)}
+                                                    {truncateUrl(item.target_url)}
                                                 </p>
                                                 <p className="text-xs text-[#666] mt-0.5">
                                                     {formatDate(item.created_at)}
@@ -472,12 +472,12 @@ export default function AnalyzerPage() {
                                                     </div>
                                                 </div>
                                                 <a
-                                                    href={item.url}
+                                                    href={item.target_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-xs text-blue-400 hover:underline break-all"
                                                 >
-                                                    {item.url}
+                                                    {item.target_url}
                                                 </a>
                                             </div>
                                         )}

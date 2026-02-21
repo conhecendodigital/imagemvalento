@@ -44,23 +44,42 @@ export async function POST(request: Request) {
         const systemPrompt = `Você é um especialista em Engajamento e Quizzes virais.
 Crie um Quiz divertido e viral sobre o tema: "${title.trim()}".
 ${description ? `Contexto adicional: "${description.trim()}"` : ""}
-Gere exatamente ${numQuestions} perguntas.
-Para cada pergunta, crie 4 opções de resposta.
+Gere exatamente ${numQuestions} perguntas com 4 opções de resposta cada.
 Atribua pontos para cada opção (ex: resposta mais forte = 10, intermediária = 5-7, fraca = 0-3).
 As perguntas devem ser envolventes, divertidas e criativas.
 
-SAÍDA OBRIGATÓRIA: Retorne APENAS um Array JSON puro, sem markdown, sem blocos de código, sem explicações, neste formato exato:
-[
-  {
-    "title": "Texto da pergunta?",
-    "options": [
-      { "text": "Opção A", "points": 10 },
-      { "text": "Opção B", "points": 5 },
-      { "text": "Opção C", "points": 3 },
-      { "text": "Opção D", "points": 0 }
-    ]
-  }
-]`;
+ALÉM DISSO, gere 3 a 4 "Resultados Possíveis" baseados na soma total de pontos.
+Cada resultado deve ter um título criativo, uma descrição engajadora de 1-2 frases, e a faixa de pontuação (scoreMin e scoreMax).
+As faixas de pontuação devem cobrir todas as pontuações possíveis sem lacunas e sem sobreposição.
+
+SAÍDA OBRIGATÓRIA: Retorne APENAS um objeto JSON puro, sem markdown, sem blocos de código, sem explicações, neste formato exato:
+{
+  "questions": [
+    {
+      "title": "Texto da pergunta?",
+      "options": [
+        { "text": "Opção A", "points": 10 },
+        { "text": "Opção B", "points": 5 },
+        { "text": "Opção C", "points": 3 },
+        { "text": "Opção D", "points": 0 }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "title": "Iniciante Curioso",
+      "description": "Você está apenas começando sua jornada...",
+      "scoreMin": 0,
+      "scoreMax": 20
+    },
+    {
+      "title": "Mestre Supremo",
+      "description": "Você domina este assunto!",
+      "scoreMin": 21,
+      "scoreMax": 50
+    }
+  ]
+}`;
 
         console.log("[generate-quiz] Chamando Gemini para:", title);
 
@@ -87,9 +106,18 @@ SAÍDA OBRIGATÓRIA: Retorne APENAS um Array JSON puro, sem markdown, sem blocos
         }
 
         // Parse and validate the JSON
-        let questions: Array<{ title: string; options: Array<{ text: string; points: number }> }>;
+        let parsed: {
+            questions?: Array<{ title: string; options: Array<{ text: string; points: number }> }>;
+            results?: Array<{ title: string; description: string; scoreMin: number; scoreMax: number }>;
+        };
         try {
-            questions = JSON.parse(cleanJson);
+            const raw = JSON.parse(cleanJson);
+            // Handle both old array format (backward compat) and new object format
+            if (Array.isArray(raw)) {
+                parsed = { questions: raw, results: [] };
+            } else {
+                parsed = raw;
+            }
         } catch {
             console.error("[generate-quiz] Erro ao parsear JSON da IA:", cleanJson.substring(0, 200));
             return NextResponse.json(
@@ -98,6 +126,7 @@ SAÍDA OBRIGATÓRIA: Retorne APENAS um Array JSON puro, sem markdown, sem blocos
             );
         }
 
+        const questions = parsed.questions;
         if (!Array.isArray(questions) || questions.length === 0) {
             return NextResponse.json(
                 { error: "A IA não gerou perguntas válidas. Tente novamente." },
@@ -131,9 +160,25 @@ SAÍDA OBRIGATÓRIA: Retorne APENAS um Array JSON puro, sem markdown, sem blocos
             );
         }
 
-        console.log(`[generate-quiz] ✅ ${validQuestions.length} perguntas geradas com sucesso`);
+        // Validate results
+        const rawResults = parsed.results || [];
+        const validResults = rawResults
+            .filter(
+                (r) =>
+                    r &&
+                    typeof r.title === "string" &&
+                    typeof r.description === "string"
+            )
+            .map((r) => ({
+                title: r.title,
+                description: r.description,
+                scoreMin: typeof r.scoreMin === "number" ? r.scoreMin : 0,
+                scoreMax: typeof r.scoreMax === "number" ? r.scoreMax : 0,
+            }));
 
-        return NextResponse.json({ questions: validQuestions });
+        console.log(`[generate-quiz] ✅ ${validQuestions.length} perguntas + ${validResults.length} resultados gerados`);
+
+        return NextResponse.json({ questions: validQuestions, results: validResults });
     } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error("[generate-quiz] ERRO:", err.message);

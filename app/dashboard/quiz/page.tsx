@@ -13,6 +13,9 @@ import {
     Copy,
     Users,
     Calendar,
+    Pencil,
+    Play,
+    Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Quiz } from "@/lib/types";
@@ -45,6 +48,24 @@ export default function QuizPage() {
         const url = `${window.location.origin}/quiz/${quiz.id}`;
         navigator.clipboard.writeText(url);
         toast.success("Link copiado!");
+    }
+
+    async function deleteQuiz(quiz: Quiz) {
+        if (!window.confirm(`Tem certeza que deseja excluir o quiz "${quiz.title}"? Esta ação não pode ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/quiz/${quiz.id}`, { method: "DELETE" });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Erro ao excluir");
+            }
+            setQuizzes(quizzes.filter((q) => q.id !== quiz.id));
+            toast.success("Quiz excluído com sucesso!");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Erro ao excluir quiz");
+        }
     }
 
     if (loading) {
@@ -151,32 +172,46 @@ export default function QuizPage() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    {quiz.status === "published" && (
-                                        <>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-[#a3a3a3] hover:text-white h-8 px-2"
-                                                onClick={() => copyLink(quiz)}
-                                            >
-                                                <Copy className="w-3.5 h-3.5 mr-1" />
-                                                Copiar link
-                                            </Button>
-                                            <Link
-                                                href={`/quiz/${quiz.id}`}
-                                                target="_blank"
-                                            >
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-[#a3a3a3] hover:text-white h-8 px-2"
-                                                >
-                                                    <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                                                    Preview
-                                                </Button>
-                                            </Link>
-                                        </>
-                                    )}
+                                    <Link
+                                        href={`/quiz/${quiz.id}`}
+                                        target="_blank"
+                                    >
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-[#a3a3a3] hover:text-white h-8 px-2 gap-1"
+                                        >
+                                            <Play className="w-3.5 h-3.5" />
+                                            Jogar
+                                        </Button>
+                                    </Link>
+                                    <Link href={`/dashboard/quiz/${quiz.id}/edit`}>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-[#a3a3a3] hover:text-white h-8 px-2 gap-1"
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            Editar
+                                        </Button>
+                                    </Link>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-[#a3a3a3] hover:text-white h-8 px-2 gap-1 ml-auto"
+                                        onClick={() => copyLink(quiz)}
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                        Link
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-[#666] hover:text-red-400 h-8 w-8 shrink-0"
+                                        onClick={() => deleteQuiz(quiz)}
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
